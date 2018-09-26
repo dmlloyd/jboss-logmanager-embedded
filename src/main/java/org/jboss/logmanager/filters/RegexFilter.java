@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2014 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +20,6 @@ import java.util.logging.LogRecord;
 import java.util.regex.Pattern;
 
 import java.util.logging.Filter;
-
-import org.jboss.logmanager.ExtLogRecord;
 
 /**
  * A regular-expression-based filter.  Used to exclude log records which match or don't match the expression.  The
@@ -59,12 +54,6 @@ public final class RegexFilter implements Filter {
      */
     @Override
     public boolean isLoggable(final LogRecord record) {
-        final String msg;
-        if (record instanceof ExtLogRecord) {
-            msg = ((ExtLogRecord) record).getFormattedMessage();
-        } else {
-            msg = record.getMessage();
-        }
-        return pattern.matcher(String.valueOf(msg)).find();
+        return record != null && pattern.matcher(String.valueOf(record.getMessage())).find();
     }
 }

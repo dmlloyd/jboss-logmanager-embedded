@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2014 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +37,7 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.regex.Pattern;
 
+import org.jboss.logmanager.ExtFormatter;
 import org.jboss.logmanager.ExtLogRecord;
 
 /**
@@ -86,6 +84,10 @@ public final class Formatters {
 
             public int estimateLength() {
                 return string.length();
+            }
+
+            public ItemType getItemType() {
+                return ItemType.TEXT;
             }
         };
     }
@@ -187,13 +189,17 @@ public final class Formatters {
         }
 
         public void render(final StringBuilder builder, final ExtLogRecord record) {
+            render(null, builder, record);
+        }
+
+        public void render(Formatter formatter, StringBuilder builder, ExtLogRecord record) {
             final int minimumWidth = this.minimumWidth;
             final int maximumWidth = this.maximumWidth;
             final boolean leftJustify = this.leftJustify;
             if (leftJustify) {
                 // no copy necessary for left justification
                 final int oldLen = builder.length();
-                renderRaw(builder, record);
+                renderRaw(formatter, builder, record);
                 final int newLen = builder.length();
                 // if we exceeded the max width, chop it off
                 final int writtenLen = newLen - oldLen;
@@ -212,7 +218,7 @@ public final class Formatters {
             } else {
                 // only copy the data if we're right justified
                 final StringBuilder subBuilder = new StringBuilder();
-                renderRaw(subBuilder, record);
+                renderRaw(formatter, subBuilder, record);
                 final int len = subBuilder.length();
                 if (len > maximumWidth) {
                     if (truncateBeginning) {
@@ -241,7 +247,7 @@ public final class Formatters {
             }
         }
 
-        public abstract void renderRaw(final StringBuilder builder, final ExtLogRecord record);
+        public abstract void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record);
     }
 
     private abstract static class SegmentedFormatStep extends JustifyingFormatStep {
@@ -260,7 +266,7 @@ public final class Formatters {
             this.precision = precision;
         }
 
-        public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+        public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
             if (precision == null) {
                 builder.append(applySegments(count, getSegmentedSubject(record)));
             } else {
@@ -298,6 +304,10 @@ public final class Formatters {
      */
     public static FormatStep loggerNameFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth, final String precision) {
         return new SegmentedFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth, precision) {
+            public ItemType getItemType() {
+                return ItemType.CATEGORY;
+            }
+
             public String getSegmentedSubject(final ExtLogRecord record) {
                 return record.getLoggerName();
             }
@@ -341,6 +351,10 @@ public final class Formatters {
             public boolean isCallerInformationRequired() {
                 return true;
             }
+
+            public ItemType getItemType() {
+                return ItemType.SOURCE_CLASS_NAME;
+            }
         };
     }
 
@@ -381,6 +395,10 @@ public final class Formatters {
             public boolean isCallerInformationRequired() {
                 return true;
             }
+
+            public ItemType getItemType() {
+                return ItemType.SOURCE_MODULE_NAME;
+            }
         };
     }
 
@@ -405,6 +423,10 @@ public final class Formatters {
             @Override
             public boolean isCallerInformationRequired() {
                 return true;
+            }
+
+            public ItemType getItemType() {
+                return ItemType.SOURCE_MODULE_VERSION;
             }
         };
     }
@@ -438,6 +460,10 @@ public final class Formatters {
     public static FormatStep dateFormatStep(final TimeZone timeZone, final String formatString, final boolean leftJustify, final int minimumWidth,
                                             final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
+            public ItemType getItemType() {
+                return ItemType.DATE;
+            }
+
             private final ThreadLocal<SimpleDateFormat> holder = new ThreadLocal<SimpleDateFormat>() {
                 protected SimpleDateFormat initialValue() {
                     final SimpleDateFormat dateFormat = new SimpleDateFormat(formatString == null ? "yyyy-MM-dd HH:mm:ss,SSS" : formatString);
@@ -446,7 +472,7 @@ public final class Formatters {
                 }
             };
 
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 builder.append(holder.get().format(new Date(record.getMillis())));
             }
         };
@@ -490,13 +516,17 @@ public final class Formatters {
      */
     public static FormatStep fileNameFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 builder.append(record.getSourceFileName());
             }
 
             @Override
             public boolean isCallerInformationRequired() {
                 return true;
+            }
+
+            public ItemType getItemType() {
+                return ItemType.SOURCE_FILE_NAME;
             }
         };
     }
@@ -512,7 +542,11 @@ public final class Formatters {
      */
     public static FormatStep processNameFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.PROCESS_NAME;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 builder.append(record.getProcessName());
             }
         };
@@ -530,7 +564,11 @@ public final class Formatters {
      */
     public static FormatStep processIdFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.PROCESS_ID;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 builder.append(record.getProcessId());
             }
         };
@@ -547,7 +585,17 @@ public final class Formatters {
      * @return the format step
      */
     public static FormatStep hostnameFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth, final boolean qualified) {
-        return hostnameFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth, qualified ? null : "1");
+        return new SegmentedFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth, null) {
+            public ItemType getItemType() {
+                return ItemType.HOST_NAME;
+            }
+
+            public String getSegmentedSubject(final ExtLogRecord record) {
+                final String hostName = record.getHostName();
+                final int idx = hostName.indexOf('.');
+                return idx == -1 ? hostName :hostName.substring(0, idx);
+            }
+        };
     }
 
     /**
@@ -562,6 +610,10 @@ public final class Formatters {
      */
     public static FormatStep hostnameFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth, final String precision) {
         return new SegmentedFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth, precision) {
+            public ItemType getItemType() {
+                return ItemType.HOST_NAME;
+            }
+
             public String getSegmentedSubject(final ExtLogRecord record) {
                 return record.getHostName();
             }
@@ -593,7 +645,7 @@ public final class Formatters {
      */
     public static FormatStep locationInformationFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 final String fileName = record.getSourceFileName();
                 final int lineNumber = record.getSourceLineNumber();
                 final String className = record.getSourceClassName();
@@ -638,13 +690,17 @@ public final class Formatters {
      */
     public static FormatStep lineNumberFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 builder.append(record.getSourceLineNumber());
             }
 
             @Override
             public boolean isCallerInformationRequired() {
                 return true;
+            }
+
+            public ItemType getItemType() {
+                return ItemType.SOURCE_LINE_NUMBER;
             }
         };
     }
@@ -672,13 +728,24 @@ public final class Formatters {
      */
     public static FormatStep messageFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
-                builder.append(record.getFormattedMessage());
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
+                String formatted;
+                if (formatter == null || record.getFormatStyle() == ExtLogRecord.FormatStyle.PRINTF && ! (formatter instanceof ExtFormatter)) {
+                    formatted = record.getFormattedMessage();
+                } else {
+                    formatted = formatter.formatMessage(record);
+                }
+                builder.append(formatted);
                 final Throwable t = record.getThrown();
                 if (t != null) {
                     builder.append(": ");
                     t.printStackTrace(new PrintWriter(new StringBuilderWriter(builder)));
                 }
+            }
+
+            // not really correct but doesn't matter for now
+            public ItemType getItemType() {
+                return ItemType.MESSAGE;
             }
         };
     }
@@ -706,8 +773,14 @@ public final class Formatters {
      */
     public static FormatStep simpleMessageFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
-                builder.append(record.getFormattedMessage());
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
+                String formatted;
+                if (formatter == null || record.getFormatStyle() == ExtLogRecord.FormatStyle.PRINTF && ! (formatter instanceof ExtFormatter)) {
+                    formatted = record.getFormattedMessage();
+                } else {
+                    formatted = formatter.formatMessage(record);
+                }
+                builder.append(formatted);
             }
         };
     }
@@ -722,7 +795,7 @@ public final class Formatters {
      * @return the format step
      */
     public static FormatStep exceptionFormatStep(final boolean leftJustify, final int minimumWidth, final int maximumWidth, final boolean extended) {
-        return exceptionFormatStep(leftJustify, minimumWidth, DEFAULT_TRUNCATE_BEGINNING, maximumWidth, null, extended);
+        return exceptionFormatStep(leftJustify, minimumWidth, DEFAULT_TRUNCATE_BEGINNING, maximumWidth, null);
     }
 
     /**
@@ -732,12 +805,16 @@ public final class Formatters {
      * @param minimumWidth the minimum field width, or 0 for none
      * @param truncateBeginning {@code true} to truncate the beginning, otherwise {@code false} to truncate the end
      * @param maximumWidth the maximum field width (must be greater than {@code minimumFieldWidth}), or 0 for none
-     * @param extended {@code true} if the stack trace should attempt to include extended JAR version information
      * @return the format step
      */
-    public static FormatStep exceptionFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth, final String argument, final boolean extended) {
+    public static FormatStep exceptionFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth, final String argument) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            // not really correct but doesn't matter for now
+            public ItemType getItemType() {
+                return ItemType.EXCEPTION_TRACE;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 doPrivileged(new PrivilegedAction<Void>() {
                     public Void run() {
                         final Throwable t = record.getThrown();
@@ -749,7 +826,7 @@ public final class Formatters {
                                 } catch (NumberFormatException ignore) {
                                 }
                             }
-                            StackTraceFormatter.renderStackTrace(builder, t, extended, depth);
+                            StackTraceFormatter.renderStackTrace(builder, t, depth);
                         }
                         return null;
                     }
@@ -781,7 +858,11 @@ public final class Formatters {
      */
     public static FormatStep resourceKeyFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.RESOURCE_KEY;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 final String key = record.getResourceKey();
                 if (key != null) builder.append(key);
             }
@@ -813,13 +894,17 @@ public final class Formatters {
      */
     public static FormatStep methodNameFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 builder.append(record.getSourceMethodName());
             }
 
             @Override
             public boolean isCallerInformationRequired() {
                 return true;
+            }
+
+            public ItemType getItemType() {
+                return ItemType.SOURCE_METHOD_NAME;
             }
         };
     }
@@ -857,7 +942,11 @@ public final class Formatters {
      */
     public static FormatStep lineSeparatorFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.SOURCE_LINE_NUMBER;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 builder.append(separatorString);
             }
         };
@@ -886,7 +975,11 @@ public final class Formatters {
      */
     public static FormatStep levelFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.LEVEL;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 final Level level = record.getLevel();
                 builder.append(level.getName());
             }
@@ -916,7 +1009,11 @@ public final class Formatters {
      */
     public static FormatStep localizedLevelFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.LEVEL;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 final Level level = record.getLevel();
                 builder.append(level.getResourceBundleName() != null ? level.getLocalizedName() : level.getName());
             }
@@ -948,7 +1045,11 @@ public final class Formatters {
      */
     public static FormatStep relativeTimeFormatStep(final long baseTime, final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.RELATIVE_TIME;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 builder.append(record.getMillis() - baseTime);
             }
         };
@@ -985,7 +1086,11 @@ public final class Formatters {
      */
     public static FormatStep threadIdFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.THREAD_ID;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 builder.append(record.getThreadID());
             }
         };
@@ -1014,7 +1119,11 @@ public final class Formatters {
      */
     public static FormatStep threadNameFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.THREAD_NAME;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 builder.append(record.getThreadName());
             }
         };
@@ -1044,6 +1153,10 @@ public final class Formatters {
      */
     public static FormatStep ndcFormatStep(final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth, final int count) {
         return new SegmentedFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth, count) {
+            public ItemType getItemType() {
+                return ItemType.NDC;
+            }
+
             public String getSegmentedSubject(final ExtLogRecord record) {
                 return record.getNdc();
             }
@@ -1073,7 +1186,11 @@ public final class Formatters {
      */
     public static FormatStep mdcFormatStep(final String key, final boolean leftJustify, final int minimumWidth, final boolean truncateBeginning, final int maximumWidth) {
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.MDC;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 if (key == null) {
                     builder.append(new TreeMap<>(record.getMdcCopy()));
                 } else {
@@ -1124,7 +1241,11 @@ public final class Formatters {
             throw new IllegalArgumentException("System property requires a key for the lookup");
         }
         return new JustifyingFormatStep(leftJustify, minimumWidth, truncateBeginning, maximumWidth) {
-            public void renderRaw(final StringBuilder builder, final ExtLogRecord record) {
+            public ItemType getItemType() {
+                return ItemType.SYSTEM_PROPERTY;
+            }
+
+            public void renderRaw(Formatter formatter, final StringBuilder builder, final ExtLogRecord record) {
                 // Check for a default value
                 final String[] parts = argument.split("(?<!\\\\):");
                 final String key = parts[0];

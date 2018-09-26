@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2014 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -116,7 +113,6 @@ public class AsyncHandler extends ExtHandler {
         if (overflowAction == null) {
             throw new NullPointerException("overflowAction is null");
         }
-        checkAccess(this);
         this.overflowAction = overflowAction;
     }
 
@@ -145,8 +141,6 @@ public class AsyncHandler extends ExtHandler {
             record.disableCallerCalculation();
             // Copy the MDC over
             record.copyMdc();
-            // In case serialization is required by a child handler
-            record.getFormattedMessage();
         }
         if (overflowAction == OverflowAction.DISCARD) {
             recordQueue.offer(record);
@@ -162,7 +156,6 @@ public class AsyncHandler extends ExtHandler {
 
     /** {@inheritDoc} */
     public void close() throws SecurityException {
-        checkAccess(this);
         if (stateUpdater.getAndSet(this, 2) != 2) {
             thread.interrupt();
             super.close();

@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2017 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -125,10 +122,6 @@ public abstract class StructuredFormatter extends ExtFormatter {
 
     private final Map<Key, String> keyOverrides;
     private final String keyOverridesValue;
-    // Guarded by this
-    private String metaData;
-    // Guarded by this
-    private Map<String, String> metaDataMap;
     private volatile boolean printDetails;
     private volatile String eorDelimiter = "\n";
     // Guarded by this
@@ -218,7 +211,7 @@ public abstract class StructuredFormatter extends ExtFormatter {
                     .add(getKey(Key.LOGGER_CLASS_NAME), record.getLoggerClassName())
                     .add(getKey(Key.LOGGER_NAME), record.getLoggerName())
                     .add(getKey(Key.LEVEL), record.getLevel().getName())
-                    .add(getKey(Key.MESSAGE), record.getFormattedMessage())
+                    .add(getKey(Key.MESSAGE), formatMessage(record))
                     .add(getKey(Key.THREAD_NAME), record.getThreadName())
                     .add(getKey(Key.THREAD_ID), record.getThreadID())
                     .add(getKey(Key.MDC), record.getMdcCopy())
@@ -260,10 +253,6 @@ public abstract class StructuredFormatter extends ExtFormatter {
                         .add(getKey(Key.SOURCE_LINE_NUMBER), record.getSourceLineNumber())
                         .add(getKey(Key.SOURCE_MODULE_NAME), record.getSourceModuleName())
                         .add(getKey(Key.SOURCE_MODULE_VERSION), record.getSourceModuleVersion());
-            }
-
-            if (isNotNullOrEmpty(metaData)) {
-                generator.addMetaData(metaDataMap);
             }
 
             after(generator, record);
@@ -315,37 +304,6 @@ public abstract class StructuredFormatter extends ExtFormatter {
      */
     public void setRecordDelimiter(final String eorDelimiter) {
         this.eorDelimiter = eorDelimiter;
-    }
-
-    /**
-     * Returns the value set for meta data.
-     * <p>
-     * The value is a string where key/value pairs are separated by commas. The key and value are separated by an
-     * equal sign.
-     * </p>
-     *
-     * @return the meta data string or {@code null} if one was not set
-     *
-     * @see PropertyValues#stringToMap(String)
-     */
-    public String getMetaData() {
-        return metaData;
-    }
-
-    /**
-     * Sets the meta data to use in the structured format.
-     * <p>
-     * The value is a string where key/value pairs are separated by commas. The key and value are separated by an
-     * equal sign.
-     * </p>
-     *
-     * @param metaData the meta data to set or {@code null} to not format any meta data
-     *
-     * @see PropertyValues#stringToMap(String)
-     */
-    public synchronized void setMetaData(final String metaData) {
-        this.metaData = metaData;
-        metaDataMap = PropertyValues.stringToMap(metaData);
     }
 
     /**

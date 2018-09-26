@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2014 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -118,8 +115,6 @@ public class ExtLogRecord extends LogRecord {
         ndc = original.ndc;
         loggerClassName = original.loggerClassName;
         threadName = original.threadName;
-        resourceKey = original.resourceKey;
-        formattedMessage = original.formattedMessage;
         hostName = original.hostName;
         processName = original.processName;
         processId = original.processId;
@@ -150,8 +145,6 @@ public class ExtLogRecord extends LogRecord {
     private FastCopyHashMap<String, Object> mdcCopy;
     private int sourceLineNumber = -1;
     private String sourceFileName;
-    private String resourceKey;
-    private String formattedMessage;
     private String threadName;
     private String hostName;
     private String processName;
@@ -172,8 +165,6 @@ public class ExtLogRecord extends LogRecord {
         mdcCopy = (FastCopyHashMap<String, Object>) fields.get("mdcCopy", new FastCopyHashMap<>());
         sourceLineNumber = fields.get("sourceLineNumber", -1);
         sourceFileName = (String) fields.get("sourceFileName", null);
-        resourceKey = (String) fields.get("resourceKey", null);
-        formattedMessage = (String) fields.get("formattedMessage", null);
         threadName = (String) fields.get("threadName", null);
         hostName = (String) fields.get("hostName", null);
         processName = (String) fields.get("processName", null);
@@ -199,7 +190,6 @@ public class ExtLogRecord extends LogRecord {
     public void copyAll() {
         copyMdc();
         calculateCaller();
-        getFormattedMessage();
     }
 
     /**
@@ -462,36 +452,17 @@ public class ExtLogRecord extends LogRecord {
      * Get the fully formatted log record, with resources resolved and parameters applied.
      *
      * @return the formatted log record
+     * @deprecated The formatter should normally be used to format the message contents.
      */
+    @Deprecated
     public String getFormattedMessage() {
-        if (formattedMessage == null) {
-            formattedMessage = formatRecord();
-        }
-        return formattedMessage;
-    }
-
-    /**
-     * Get the resource key, if any.  If the log message is not localized, then the key is {@code null}.
-     *
-     * @return the resource key
-     */
-    public String getResourceKey() {
-        if (formattedMessage == null) {
-            formatRecord();
-        }
-        return resourceKey;
-    }
-
-    private String formatRecord() {
         final ResourceBundle bundle = getResourceBundle();
         String msg = getMessage();
         if (msg == null)
             return null;
         if (bundle != null) {
             try {
-                String locMsg = bundle.getString(msg);
-                resourceKey = msg;
-                msg = locMsg;
+                msg = bundle.getString(msg);
             } catch (MissingResourceException ex) {
                 // ignore
             }
@@ -509,6 +480,18 @@ public class ExtLogRecord extends LogRecord {
             }
         }
         // should be unreachable
+        return msg;
+    }
+
+    /**
+     * Get the resource key, if any.  If the log message is not localized, then the key is {@code null}.
+     *
+     * @return the resource key
+     */
+    public String getResourceKey() {
+        final String msg = getMessage();
+        if (msg == null) return null;
+        if (getResourceBundleName() == null && getResourceBundle() == null) return null;
         return msg;
     }
 
@@ -603,7 +586,6 @@ public class ExtLogRecord extends LogRecord {
      */
     public void setMessage(final String message, final FormatStyle formatStyle) {
         this.formatStyle = formatStyle == null ? FormatStyle.MESSAGE_FORMAT : formatStyle;
-        formattedMessage = null;
         super.setMessage(message);
     }
 
@@ -613,7 +595,6 @@ public class ExtLogRecord extends LogRecord {
      * @param parameters the log message parameters. (may be null)
      */
     public void setParameters(final Object[] parameters) {
-        formattedMessage = null;
         super.setParameters(parameters);
     }
 
@@ -623,7 +604,6 @@ public class ExtLogRecord extends LogRecord {
      * @param bundle localization bundle (may be null)
      */
     public void setResourceBundle(final ResourceBundle bundle) {
-        formattedMessage = null;
         super.setResourceBundle(bundle);
     }
 
@@ -633,7 +613,6 @@ public class ExtLogRecord extends LogRecord {
      * @param name localization bundle name (may be null)
      */
     public void setResourceBundleName(final String name) {
-        formattedMessage = null;
         super.setResourceBundleName(name);
     }
 }

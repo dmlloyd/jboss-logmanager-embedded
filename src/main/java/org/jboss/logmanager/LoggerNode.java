@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2014 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,22 +16,24 @@
 
 package org.jboss.logmanager;
 
-import java.security.AccessController;
-import java.security.PrivilegedAction;
+import com.oracle.svm.core.annotate.AlwaysInline;
+import org.wildfly.common.lock.SpinLock;
+
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.logging.Filter;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 
+import static java.lang.Math.max;
+
 /**
  * A node in the tree of logger names.  Maintains weak references to children and a strong reference to its parent.
  */
-final class LoggerNode implements AutoCloseable {
+final class LoggerNode {
+
+    private static final Object[] NO_ATTACHMENTS = new Object[0];
 
     /**
      * The log context.
@@ -77,19 +76,9 @@ final class LoggerNode implements AutoCloseable {
     private volatile boolean useParentFilter = false;
 
     /**
-     * The attachments map.
-     */
-    private volatile Map<Logger.AttachmentKey, Object> attachments = Collections.emptyMap();
-
-    /**
      * The atomic updater for the {@link #handlers} field.
      */
     private static final AtomicArray<LoggerNode, Handler> handlersUpdater = AtomicArray.create(AtomicReferenceFieldUpdater.newUpdater(LoggerNode.class, Handler[].class, "handlers"), Handler.class);
-
-    /**
-     * The atomic updater for the {@link #attachments} field.
-     */
-    private static final AtomicReferenceFieldUpdater<LoggerNode, Map> attachmentsUpdater = AtomicReferenceFieldUpdater.newUpdater(LoggerNode.class, Map.class, "attachments");
 
     /**
      * The actual level.  May only be modified when the context's level change lock is held; in addition, changing
@@ -100,7 +89,17 @@ final class LoggerNode implements AutoCloseable {
      * The effective level.  May only be modified when the context's level change lock is held; in addition, changing
      * this field must be followed immediately by recursively updating the effective loglevel of the child tree.
      */
-    private volatile int effectiveLevel = Logger.INFO_INT;
+    private volatile int effectiveLevel;
+
+    private final int effectiveMinLevel;
+
+    private volatile boolean hasLogger;
+
+    private final SpinLock attachmentLock = new SpinLock();
+
+    private Logger.AttachmentKey<?> attachmentKey;
+
+    private Object attachment;
 
     /**
      * Construct a new root instance.
@@ -108,11 +107,17 @@ final class LoggerNode implements AutoCloseable {
      * @param context the logmanager
      */
     LoggerNode(final LogContext context) {
+        final EmbeddedConfigurator configurator = LogContext.CONFIGURATOR;
         parent = null;
         fullName = "";
-        handlersUpdater.clear(this);
+        final Level minLevel = configurator.getMinimumLevelOf(fullName);
+        effectiveMinLevel = minLevel == null ? Logger.INFO_INT : minLevel.intValue();
+        final Level confLevel = configurator.getLevelOf(fullName);
+        level = confLevel == null ? Level.INFO : confLevel;
+        effectiveLevel = max(effectiveMinLevel, level.intValue());
+        handlersUpdater.set(this, configurator.getHandlersOf(fullName));
         this.context = context;
-        children = context.createChildMap();
+        children = new CopyOnWriteMap<String, LoggerNode>();
     }
 
     /**
@@ -123,12 +128,12 @@ final class LoggerNode implements AutoCloseable {
      * @param nodeName the name of this subnode
      */
     private LoggerNode(LogContext context, LoggerNode parent, String nodeName) {
+        final EmbeddedConfigurator configurator = LogContext.CONFIGURATOR;
         nodeName = nodeName.trim();
         if (nodeName.length() == 0 && parent == null) {
             throw new IllegalArgumentException("nodeName is empty, or just whitespace and has no parent");
         }
         this.parent = parent;
-        handlersUpdater.clear(this);
         if (parent.parent == null) {
             if (nodeName.isEmpty()) {
                 fullName = ".";
@@ -138,29 +143,13 @@ final class LoggerNode implements AutoCloseable {
         } else {
             fullName = parent.fullName + "." + nodeName;
         }
+        final Level minLevel = configurator.getMinimumLevelOf(fullName);
+        effectiveMinLevel = minLevel == null ? parent.effectiveMinLevel : minLevel.intValue();
+        level = configurator.getLevelOf(fullName);
+        effectiveLevel = max(effectiveMinLevel, level == null ? parent.effectiveLevel : level.intValue());
+        handlersUpdater.set(this, configurator.getHandlersOf(fullName));
         this.context = context;
-        effectiveLevel = parent.effectiveLevel;
-        children = context.createChildMap();
-    }
-
-    @Override
-    public void close() {
-        synchronized (context.treeLock) {
-            // Reset everything to defaults
-            filter = null;
-            if ("".equals(fullName)) {
-                level = Level.INFO;
-                effectiveLevel = Level.INFO.intValue();
-            } else {
-                level = null;
-                effectiveLevel = Level.INFO.intValue();
-            }
-            handlersUpdater.clear(this);
-            useParentFilter = false;
-            useParentHandlers = true;
-            attachmentsUpdater.get(this).clear();
-            children.clear();
-        }
+        children = new CopyOnWriteMap<String, LoggerNode>();
     }
 
     /**
@@ -216,27 +205,8 @@ final class LoggerNode implements AutoCloseable {
     }
 
     Logger createLogger() {
-        final SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            return AccessController.doPrivileged(new PrivilegedAction<Logger>() {
-                public Logger run() {
-                    final Logger logger = new Logger(LoggerNode.this, fullName);
-                    context.incrementRef(fullName);
-                    return logger;
-                }
-            });
-        } else {
-            final Logger logger = new Logger(this, fullName);
-            context.incrementRef(fullName);
-            return logger;
-        }
-    }
-
-    /**
-     * Removes one from the reference count.
-     */
-    void decrementRef() {
-        context.decrementRef(fullName);
+        hasLogger = true;
+        return new Logger(this, fullName);
     }
 
     /**
@@ -290,17 +260,30 @@ final class LoggerNode implements AutoCloseable {
         this.useParentFilter = useParentFilter;
     }
 
+    @AlwaysInline("Fast level checks")
     int getEffectiveLevel() {
         return effectiveLevel;
     }
 
+    @AlwaysInline("Fast level checks")
+    boolean isLoggableLevel(int level) {
+        return level != Logger.OFF_INT && level >= effectiveMinLevel && level >= effectiveLevel;
+    }
+
     Handler[] getHandlers() {
+        Handler[] handlers = this.handlers;
+        if (handlers == null) {
+            synchronized (this) {
+                handlers = LogContext.CONFIGURATOR.getHandlersOf(fullName);
+                this.handlers = handlers;
+            }
+        }
         return handlers;
     }
 
     Handler[] clearHandlers() {
         final Handler[] handlers = this.handlers;
-        handlersUpdater.clear(this);
+        handlersUpdater.set(this, EmbeddedConfigurator.NO_HANDLERS);
         return handlers.length > 0 ? handlers.clone() : handlers;
     }
 
@@ -329,7 +312,7 @@ final class LoggerNode implements AutoCloseable {
     }
 
     void publish(final ExtLogRecord record) {
-        for (Handler handler : handlers) try {
+        for (Handler handler : getHandlers()) try {
             handler.publish(record);
         } catch (VirtualMachineError e) {
             throw e;
@@ -382,8 +365,13 @@ final class LoggerNode implements AutoCloseable {
         if (key == null) {
             throw new NullPointerException("key is null");
         }
-        final Map<Logger.AttachmentKey, Object> attachments = this.attachments;
-        return (V) attachments.get(key);
+        final SpinLock lock = this.attachmentLock;
+        lock.lock();
+        try {
+            return key == attachmentKey ? (V) attachment : null;
+        } finally {
+            lock.unlock();
+        }
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -394,15 +382,25 @@ final class LoggerNode implements AutoCloseable {
         if (value == null) {
             throw new NullPointerException("value is null");
         }
-        Map<Logger.AttachmentKey, Object> oldAttachments;
-        Map<Logger.AttachmentKey, Object> newAttachments;
-        V old;
-        do {
-            oldAttachments = attachments;
-            newAttachments = new HashMap<>(oldAttachments);
-            old = (V) newAttachments.put(key, value);
-        } while (! attachmentsUpdater.compareAndSet(this, oldAttachments, newAttachments));
-        return old;
+        final SpinLock lock = this.attachmentLock;
+        lock.lock();
+        try {
+            final Logger.AttachmentKey<?> attachmentKey = this.attachmentKey;
+            if (attachmentKey == null) {
+                this.attachmentKey = key;
+                attachment = value;
+                return null;
+            } else if (key == attachmentKey) {
+                try {
+                    return (V) attachment;
+                } finally {
+                    attachment = value;
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+        throw new IllegalStateException("Maximum number of attachments exceeded");
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -413,17 +411,21 @@ final class LoggerNode implements AutoCloseable {
         if (value == null) {
             throw new NullPointerException("value is null");
         }
-        Map<Logger.AttachmentKey, Object> oldAttachments;
-        Map<Logger.AttachmentKey, Object> newAttachments;
-        do {
-            oldAttachments = attachments;
-            if (oldAttachments.containsKey(key)) {
-                return (V) oldAttachments.get(key);
+        final SpinLock lock = this.attachmentLock;
+        lock.lock();
+        try {
+            final Logger.AttachmentKey<?> attachmentKey = this.attachmentKey;
+            if (attachmentKey == null) {
+                this.attachmentKey = key;
+                attachment = value;
+                return null;
+            } else if (key == attachmentKey) {
+                return (V) attachment;
             }
-            newAttachments = new HashMap<>(oldAttachments);
-            newAttachments.put(key, value);
-        } while (! attachmentsUpdater.compareAndSet(this, oldAttachments, newAttachments));
-        return null;
+        } finally {
+            lock.unlock();
+        }
+        throw new IllegalStateException("Maximum number of attachments exceeded");
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -431,28 +433,23 @@ final class LoggerNode implements AutoCloseable {
         if (key == null) {
             throw new NullPointerException("key is null");
         }
-        Map<Logger.AttachmentKey, Object> oldAttachments;
-        Map<Logger.AttachmentKey, Object> newAttachments;
-        V result;
-        do {
-            oldAttachments = attachments;
-            result = (V) oldAttachments.get(key);
-            if (result == null) {
+        final SpinLock lock = this.attachmentLock;
+        lock.lock();
+        try {
+            final Logger.AttachmentKey<?> attachmentKey = this.attachmentKey;
+            if (attachmentKey == key) {
+                try {
+                    return (V) attachment;
+                } finally {
+                    this.attachmentKey = null;
+                    this.attachment = null;
+                }
+            } else {
                 return null;
             }
-            final int size = oldAttachments.size();
-            if (size == 1) {
-                // special case - the new map is empty
-                newAttachments = Collections.emptyMap();
-            } else {
-                newAttachments = new HashMap<Logger.AttachmentKey, Object>(oldAttachments);
-            }
-        } while (! attachmentsUpdater.compareAndSet(this, oldAttachments, newAttachments));
-        return result;
-    }
-
-    String getFullName() {
-        return fullName;
+        } finally {
+            lock.unlock();
+        }
     }
 
     LoggerNode getParent() {
@@ -487,19 +484,11 @@ final class LoggerNode implements AutoCloseable {
         return !(filter != null && !filter.isLoggable(record)) && (!loggerNode.useParentFilter || isLoggable(loggerNode.getParent(), record));
     }
 
-    // GC
+    public boolean hasLogger() {
+        return hasLogger;
+    }
 
-    /**
-     * Perform finalization actions.  This amounts to clearing out the loglevel so that all children are updated
-     * with the parent's effective loglevel.  As such, a lock is acquired from this method which might cause delays in
-     * garbage collection.
-     */
-    protected void finalize() throws Throwable {
-        try {
-            // clear out level so that it spams out to all children
-            setLevel(null);
-        } finally {
-            super.finalize();
-        }
+    public String getFullName() {
+        return fullName;
     }
 }

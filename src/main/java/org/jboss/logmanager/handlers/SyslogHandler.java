@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2014 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -519,7 +516,7 @@ public class SyslogHandler extends ExtHandler {
                 }
 
                 // Trailer in bytes
-                final byte[] trailer = delimiter == null ? new byte[] {0x00} : delimiter.getBytes();
+                final byte[] trailer = delimiter == null ? new byte[] {0x00} : delimiter.getBytes("UTF-8");
 
                 // Buffer currently only has the header
                 final int maxMsgLen = maxLen - (header.length + (useDelimiter ? trailer.length : 0));
@@ -631,7 +628,6 @@ public class SyslogHandler extends ExtHandler {
      *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
      */
     public void setAppName(final String appName) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.appName = checkPrintableAscii("app name", appName);
         }
@@ -661,7 +657,6 @@ public class SyslogHandler extends ExtHandler {
      *                         discarding any new messages coming in
      */
     public void setBlockOnReconnect(final boolean blockOnReconnect) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.blockOnReconnect = blockOnReconnect;
             if (out instanceof TcpOutputStream) {
@@ -676,7 +671,6 @@ public class SyslogHandler extends ExtHandler {
      * @param clientSocketFactory the client socket factory to use
      */
     public void setClientSocketFactory(final ClientSocketFactory clientSocketFactory) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.clientSocketFactory = clientSocketFactory;
             initializeConnection = true;
@@ -711,7 +705,6 @@ public class SyslogHandler extends ExtHandler {
      */
     @Deprecated
     public void setEscapeEnabled(final boolean escapeEnabled) {
-        checkAccess(this);
     }
 
     /**
@@ -745,7 +738,6 @@ public class SyslogHandler extends ExtHandler {
      *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
      */
     public void setPort(final int port) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.port = port;
             initializeConnection = true;
@@ -772,7 +764,6 @@ public class SyslogHandler extends ExtHandler {
      *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
      */
     public void setFacility(final Facility facility) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.facility = facility;
         }
@@ -808,7 +799,6 @@ public class SyslogHandler extends ExtHandler {
      * @param maxLen the maximum length, in bytes, allowed to be sent to the syslog server
      */
     public void setMaxLength(final int maxLen) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.maxLen = maxLen;
         }
@@ -821,7 +811,6 @@ public class SyslogHandler extends ExtHandler {
      * @return the delimiter being used for the message
      */
     public String getMessageDelimiter() {
-        checkAccess(this);
         synchronized (outputLock) {
             return delimiter;
         }
@@ -834,7 +823,6 @@ public class SyslogHandler extends ExtHandler {
      * @param delimiter the delimiter to use for the message
      */
     public void setMessageDelimiter(final String delimiter) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.delimiter = delimiter;
         }
@@ -857,7 +845,6 @@ public class SyslogHandler extends ExtHandler {
      * @param useDelimiter {@code true} to append the message with a delimiter, otherwise {@code false}
      */
     public void setUseMessageDelimiter(final boolean useDelimiter) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.useDelimiter = useDelimiter;
         }
@@ -881,7 +868,6 @@ public class SyslogHandler extends ExtHandler {
      * @param hostname the host name
      */
     public void setHostname(final String hostname) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.hostname = checkPrintableAscii("host name", hostname);
         }
@@ -913,7 +899,6 @@ public class SyslogHandler extends ExtHandler {
      *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
      */
     public void setUseCountingFraming(final boolean useCountingFraming) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.useCountingFraming = useCountingFraming;
         }
@@ -931,7 +916,6 @@ public class SyslogHandler extends ExtHandler {
      * @see InetAddress#getByName(String)
      */
     public void setServerHostname(final String hostname) throws UnknownHostException {
-        checkAccess(this);
         setServerAddress(InetAddress.getByName(hostname));
     }
 
@@ -955,7 +939,6 @@ public class SyslogHandler extends ExtHandler {
      *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
      */
     public void setServerAddress(final InetAddress serverAddress) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.serverAddress = serverAddress;
             initializeConnection = true;
@@ -982,7 +965,6 @@ public class SyslogHandler extends ExtHandler {
      *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
      */
     public void setSyslogType(final SyslogType syslogType) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.syslogType = syslogType;
         }
@@ -1005,7 +987,6 @@ public class SyslogHandler extends ExtHandler {
      * @param type the protocol
      */
     public void setProtocol(final Protocol type) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.protocol = type;
             initializeConnection = true;
@@ -1024,7 +1005,6 @@ public class SyslogHandler extends ExtHandler {
      * @param out the output stream to write to
      */
     public void setOutputStream(final OutputStream out) {
-        checkAccess(this);
         setOutputStream(out, true);
     }
 
@@ -1049,7 +1029,6 @@ public class SyslogHandler extends ExtHandler {
      * @param truncate {@code true} to truncate, otherwise {@code false} to send multiple messages
      */
     public void setTruncate(final boolean truncate) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.truncate = truncate;
         }

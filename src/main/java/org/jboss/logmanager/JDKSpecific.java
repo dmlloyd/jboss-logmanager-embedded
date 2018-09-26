@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2017 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +18,6 @@ package org.jboss.logmanager;
 
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
 
 import org.jboss.modules.Module;
 import org.jboss.modules.Version;
@@ -39,11 +32,7 @@ final class JDKSpecific {
     private static final boolean JBOSS_MODULES;
 
     static {
-        GATEWAY = AccessController.doPrivileged(new PrivilegedAction<Gateway>() {
-            public Gateway run() {
-                return new Gateway();
-            }
-        });
+        GATEWAY = AccessController.doPrivileged(new GatewayPrivilegedAction());
         boolean jbossModules = false;
         try {
             Module.getStartTime();
@@ -56,27 +45,6 @@ final class JDKSpecific {
         protected Class<?>[] getClassContext() {
             return super.getClassContext();
         }
-    }
-
-    static Class<?> findCallingClass(Set<ClassLoader> rejectClassLoaders) {
-        for (Class<?> caller : GATEWAY.getClassContext()) {
-            final ClassLoader classLoader = caller.getClassLoader();
-            if (classLoader != null && ! rejectClassLoaders.contains(classLoader)) {
-                return caller;
-            }
-        }
-        return null;
-    }
-
-    static Collection<Class<?>> findCallingClasses(Set<ClassLoader> rejectClassLoaders) {
-        final Collection<Class<?>> result = new LinkedHashSet<>();
-        for (Class<?> caller : GATEWAY.getClassContext()) {
-            final ClassLoader classLoader = caller.getClassLoader();
-            if (classLoader != null && ! rejectClassLoaders.contains(classLoader)) {
-                result.add(caller);
-            }
-        }
-        return result;
     }
 
     static void calculateCaller(ExtLogRecord logRecord) {
@@ -105,7 +73,7 @@ final class JDKSpecific {
                         return;
                     }
                 }
-                if (j == classes.length) {
+                if (j == stackTrace.length) {
                     logRecord.setUnknownCaller();
                     return;
                 }
@@ -129,6 +97,15 @@ final class JDKSpecific {
             } else {
                 logRecord.setSourceModuleVersion(null);
             }
+        }
+    }
+
+    static class GatewayPrivilegedAction implements PrivilegedAction<Gateway> {
+        GatewayPrivilegedAction() {
+        }
+
+        public Gateway run() {
+            return new Gateway();
         }
     }
 }

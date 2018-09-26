@@ -46,10 +46,9 @@ class StackTraceFormatter {
      *
      * @param builder         the string builder ot append the stack trace to
      * @param t               the throwable to render
-     * @param extended        ignored
      * @param suppressedDepth the number of suppressed messages to include
      */
-    static void renderStackTrace(final StringBuilder builder, final Throwable t, @SuppressWarnings("unused") final boolean extended, final int suppressedDepth) {
+    static void renderStackTrace(final StringBuilder builder, final Throwable t, final int suppressedDepth) {
         new StackTraceFormatter(builder, suppressedDepth).renderStackTrace(t);
     }
 

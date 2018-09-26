@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2014 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +16,7 @@
 
 package org.jboss.logmanager.filters;
 
+import java.text.MessageFormat;
 import java.util.logging.LogRecord;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -77,7 +75,7 @@ public final class SubstituteFilter implements Filter {
         if (record instanceof ExtLogRecord) {
             currentMsg = ((ExtLogRecord) record).getFormattedMessage();
         } else {
-            currentMsg = record.getMessage();
+            currentMsg = MessageFormat.format(record.getMessage(), record.getParameters());
         }
         final Matcher matcher = pattern.matcher(String.valueOf(currentMsg));
         final String msg;

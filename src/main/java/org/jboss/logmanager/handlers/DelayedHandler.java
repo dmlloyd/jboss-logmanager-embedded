@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2017 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +20,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
+import java.util.logging.Logger;
 
 import org.jboss.logmanager.ExtHandler;
 import org.jboss.logmanager.ExtLogRecord;
@@ -66,8 +64,6 @@ public class DelayedHandler extends ExtHandler {
                         record.disableCallerCalculation();
                         // Copy the MDC over
                         record.copyMdc();
-                        // In case serialization is required by a child handler
-                        record.getFormattedMessage();
                     }
                     logRecords.addLast(record);
                 }
@@ -77,7 +73,6 @@ public class DelayedHandler extends ExtHandler {
 
     @Override
     public final void close() throws SecurityException {
-        checkAccess(this);
         synchronized (this) {
             if (!logRecords.isEmpty()) {
                 Formatter formatter = getFormatter();
@@ -201,7 +196,7 @@ public class DelayedHandler extends ExtHandler {
         // Always attempt to drain the queue
         ExtLogRecord record;
         while ((record = logRecords.pollFirst()) != null) {
-            if (isEnabled() && isLoggable(record)) {
+            if (isEnabled() && isLoggable(record) && Logger.getLogger(record.getLoggerName()).isLoggable(record.getLevel())) {
                 publishToChildren(record);
             }
         }

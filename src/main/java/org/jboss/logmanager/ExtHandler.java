@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2014 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +17,6 @@
 package org.jboss.logmanager;
 
 import java.io.UnsupportedEncodingException;
-import java.security.Permission;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.logging.ErrorManager;
 import java.util.logging.Filter;
@@ -28,7 +24,6 @@ import java.util.logging.Formatter;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
-import java.util.logging.LoggingPermission;
 
 import org.jboss.logmanager.errormanager.OnlyOnceErrorManager;
 import org.jboss.logmanager.handlers.FlushableCloseable;
@@ -37,24 +32,18 @@ import org.jboss.logmanager.handlers.FlushableCloseable;
  * An extended logger handler.  Use this class as a base class for log handlers which require {@code ExtLogRecord}
  * instances.
  */
-public abstract class ExtHandler extends Handler implements FlushableCloseable, Protectable {
+public abstract class ExtHandler extends Handler implements FlushableCloseable {
 
-    private static final Permission CONTROL_PERMISSION = new LoggingPermission("control", null);
     private volatile boolean autoFlush = true;
     private volatile boolean enabled = true;
     private volatile boolean closeChildren;
     private static final ErrorManager DEFAULT_ERROR_MANAGER = new OnlyOnceErrorManager();
 
-    private volatile Object protectKey;
-    private final ThreadLocal<Boolean> granted = new InheritableThreadLocal<Boolean>();
-
-    private static final AtomicReferenceFieldUpdater<ExtHandler, Object> protectKeyUpdater = AtomicReferenceFieldUpdater.newUpdater(ExtHandler.class, Object.class, "protectKey");
-
     /**
      * The sub-handlers for this handler.  May only be updated using the {@link #handlersUpdater} atomic updater.  The array
      * instance should not be modified (treat as immutable).
      */
-    @SuppressWarnings({ "UnusedDeclaration" })
+    @SuppressWarnings("unused")
     protected volatile Handler[] handlers;
 
     /**
@@ -109,12 +98,8 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
      * Add a sub-handler to this handler.  Some handler types do not utilize sub-handlers.
      *
      * @param handler the handler to add
-     *
-     * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}.
      */
-    public void addHandler(Handler handler) throws SecurityException {
-        checkAccess(this);
+    public void addHandler(Handler handler) {
         if (handler == null) {
             throw new NullPointerException("handler is null");
         }
@@ -125,12 +110,8 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
      * Remove a sub-handler from this handler.  Some handler types do not utilize sub-handlers.
      *
      * @param handler the handler to remove
-     *
-     * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}.
      */
     public void removeHandler(Handler handler) throws SecurityException {
-        checkAccess(this);
         if (handler == null) {
             return;
         }
@@ -151,12 +132,8 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
      * A convenience method to atomically get and clear all sub-handlers.
      *
      * @return the old sub-handler array
-     *
-     * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}.
      */
     public Handler[] clearHandlers() throws SecurityException {
-        checkAccess(this);
         final Handler[] handlers = this.handlers;
         handlersUpdater.clear(this);
         return handlers.length > 0 ? handlers.clone() : handlers;
@@ -167,9 +144,6 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
      *
      * @param newHandlers the new sub-handlers
      * @return the old sub-handler array
-     *
-     * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}.
      */
     public Handler[] setHandlers(final Handler[] newHandlers) throws SecurityException {
         if (newHandlers == null) {
@@ -178,7 +152,6 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
         if (newHandlers.length == 0) {
             return clearHandlers();
         } else {
-            checkAccess(this);
             final Handler[] handlers = handlersUpdater.getAndSet(this, newHandlers);
             return handlers.length > 0 ? handlers.clone() : handlers;
         }
@@ -197,12 +170,8 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
      * Change the autoflush setting for this handler.
      *
      * @param autoFlush {@code true} to automatically flush after each write; false otherwise
-     *
-     * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}.
      */
     public void setAutoFlush(final boolean autoFlush) throws SecurityException {
-        checkAccess(this);
         this.autoFlush = autoFlush;
         if (autoFlush) {
             flush();
@@ -213,12 +182,8 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
      * Enables or disables the handler based on the value passed in.
      *
      * @param enabled {@code true} to enable the handler or {@code false} to disable the handler.
-     *
-     * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}.
      */
     public final void setEnabled(final boolean enabled) throws SecurityException {
-        checkAccess(this);
         this.enabled = enabled;
     }
 
@@ -249,73 +214,7 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
      *                      is closed
      */
     public void setCloseChildren(final boolean closeChildren) {
-        checkAccess(this);
         this.closeChildren = closeChildren;
-    }
-
-    @Override
-    public final void protect(Object protectionKey) throws SecurityException {
-        if (protectKeyUpdater.compareAndSet(this, null, protectionKey)) {
-            return;
-        }
-        throw new SecurityException("Log handler already protected");
-    }
-
-    @Override
-    public final void unprotect(Object protectionKey) throws SecurityException {
-        if (protectKeyUpdater.compareAndSet(this, protectionKey, null)) {
-            return;
-        }
-        throw accessDenied();
-    }
-
-    @Override
-    public final void enableAccess(Object protectKey) {
-        if (protectKey == this.protectKey) {
-            granted.set(Boolean.TRUE);
-        }
-    }
-
-    @Override
-    public final void disableAccess() {
-        granted.remove();
-    }
-
-    private static SecurityException accessDenied() {
-        return new SecurityException("Log handler modification access denied");
-    }
-
-    /**
-     * Check access.
-     *
-     * @deprecated use {@link #checkAccess(ExtHandler)}
-     *
-     * @throws SecurityException if a security manager is installed and the caller does not have the {@code "control" LoggingPermission}
-     */
-    @Deprecated
-    protected static void checkAccess() throws SecurityException {
-        final SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkPermission(CONTROL_PERMISSION);
-        }
-    }
-
-    /**
-     * Check access.
-     *
-     * @param handler the handler to check access on.
-     *
-     * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}.
-     */
-    protected static void checkAccess(final ExtHandler handler) throws SecurityException {
-        final SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkPermission(CONTROL_PERMISSION);
-        }
-        if (handler.protectKey != null && handler.granted.get() == null) {
-            throw accessDenied();
-        }
     }
 
     /**
@@ -335,7 +234,6 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
      */
     @Override
     public void close() throws SecurityException {
-        checkAccess(this);
         if (closeChildren) {
             for (Handler handler : handlers)
                 try {
@@ -349,31 +247,26 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
 
     @Override
     public void setFormatter(final Formatter newFormatter) throws SecurityException {
-        checkAccess(this);
         super.setFormatter(newFormatter);
     }
 
     @Override
     public void setFilter(final Filter newFilter) throws SecurityException {
-        checkAccess(this);
         super.setFilter(newFilter);
     }
 
     @Override
     public void setEncoding(final String encoding) throws SecurityException, UnsupportedEncodingException {
-        checkAccess(this);
         super.setEncoding(encoding);
     }
 
     @Override
     public void setErrorManager(final ErrorManager em) {
-        checkAccess(this);
         super.setErrorManager(em);
     }
 
     @Override
     public void setLevel(final Level newLevel) throws SecurityException {
-        checkAccess(this);
         super.setLevel(newLevel);
     }
 
@@ -400,9 +293,12 @@ public abstract class ExtHandler extends Handler implements FlushableCloseable, 
         Formatter formatter = getFormatter();
         if (formatterRequiresCallerCalculation(formatter)) {
             return true;
-        } else {
-            final Handler[] handlers = getHandlers();
-            for (Handler handler : handlers) {
+        } else for (Handler handler : getHandlers()) {
+            if (handler instanceof ExtHandler) {
+                if (((ExtHandler) handler).isCallerCalculationRequired()) {
+                    return true;
+                }
+            } else {
                 formatter = handler.getFormatter();
                 if (formatterRequiresCallerCalculation(formatter)) {
                     return true;

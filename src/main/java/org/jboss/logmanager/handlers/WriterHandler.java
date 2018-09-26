@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2014 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,7 +86,6 @@ public class WriterHandler extends ExtHandler {
      * @param writer the new writer, or {@code null} to disable logging
      */
     public void setWriter(final Writer writer) {
-        checkAccess(this);
         Writer oldWriter = null;
         boolean ok = false;
         try {
@@ -147,7 +143,6 @@ public class WriterHandler extends ExtHandler {
      * @throws SecurityException if the caller does not have sufficient permission
      */
     public void close() throws SecurityException {
-        checkAccess(this);
         setWriter(null);
         super.close();
     }
@@ -165,7 +160,7 @@ public class WriterHandler extends ExtHandler {
         } catch (Throwable ignored) {}
     }
 
-    private void safeFlush(Flushable f) {
+    void safeFlush(Flushable f) {
         try {
             if (f != null) f.flush();
         } catch (Exception e) {

@@ -1,8 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- *
- * Copyright 2014 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2018 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -181,7 +178,6 @@ public class PeriodicSizeRotatingFileHandler extends PeriodicRotatingFileHandler
      * @param rotateOnBoot {@code true} to rotate on boot, otherwise {@code false}
      */
     public void setRotateOnBoot(final boolean rotateOnBoot) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.rotateOnBoot = rotateOnBoot;
         }
@@ -193,7 +189,6 @@ public class PeriodicSizeRotatingFileHandler extends PeriodicRotatingFileHandler
      * @param rotateSize the number of bytes before the log is rotated
      */
     public void setRotateSize(final long rotateSize) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.rotateSize = rotateSize;
         }
@@ -205,7 +200,6 @@ public class PeriodicSizeRotatingFileHandler extends PeriodicRotatingFileHandler
      * @param maxBackupIndex the maximum backup index
      */
     public void setMaxBackupIndex(final int maxBackupIndex) {
-        checkAccess(this);
         synchronized (outputLock) {
             this.maxBackupIndex = maxBackupIndex;
         }

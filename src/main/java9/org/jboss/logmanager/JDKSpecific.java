@@ -23,12 +23,9 @@ import static java.security.AccessController.doPrivileged;
 
 import java.lang.module.ModuleDescriptor;
 import java.security.PrivilegedAction;
-import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -53,24 +50,6 @@ final class JDKSpecific {
             jbossModules = true;
         } catch (Throwable ignored) {}
         JBOSS_MODULES = jbossModules;
-    }
-
-    static Class<?> findCallingClass(Set<ClassLoader> rejectClassLoaders) {
-        final SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            return doPrivileged(new FindCallingClassAction(rejectClassLoaders));
-        } else {
-            return WALKER.walk(new FindFirstWalkFunction(rejectClassLoaders));
-        }
-    }
-
-    static Collection<Class<?>> findCallingClasses(Set<ClassLoader> rejectClassLoaders) {
-        final SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            return doPrivileged(new FindCallingClassesAction(rejectClassLoaders));
-        } else {
-            return WALKER.walk(new FindAllWalkFunction(rejectClassLoaders));
-        }
     }
 
     static void calculateCaller(ExtLogRecord logRecord) {
@@ -151,68 +130,4 @@ final class JDKSpecific {
         }
     }
 
-    static final class FindCallingClassAction implements PrivilegedAction<Class<?>> {
-        private final Set<ClassLoader> rejectClassLoaders;
-
-        FindCallingClassAction(final Set<ClassLoader> rejectClassLoaders) {
-            this.rejectClassLoaders = rejectClassLoaders;
-        }
-
-        public Class<?> run() {
-            return WALKER.walk(new FindFirstWalkFunction(rejectClassLoaders));
-        }
-    }
-
-    static final class FindCallingClassesAction implements PrivilegedAction<Collection<Class<?>>> {
-        private final Set<ClassLoader> rejectClassLoaders;
-
-        FindCallingClassesAction(final Set<ClassLoader> rejectClassLoaders) {
-            this.rejectClassLoaders = rejectClassLoaders;
-        }
-
-        public Collection<Class<?>> run() {
-            return WALKER.walk(new FindAllWalkFunction(rejectClassLoaders));
-        }
-    }
-
-    static final class FindFirstWalkFunction implements Function<Stream<StackWalker.StackFrame>, Class<?>> {
-        private final Set<ClassLoader> rejectClassLoaders;
-
-        FindFirstWalkFunction(final Set<ClassLoader> rejectClassLoaders) {
-            this.rejectClassLoaders = rejectClassLoaders;
-        }
-
-        public Class<?> apply(final Stream<StackWalker.StackFrame> stream) {
-            final Iterator<StackWalker.StackFrame> iterator = stream.iterator();
-            while (iterator.hasNext()) {
-                final Class<?> clazz = iterator.next().getDeclaringClass();
-                final ClassLoader classLoader = clazz.getClassLoader();
-                if (! rejectClassLoaders.contains(classLoader)) {
-                    return clazz;
-                }
-            }
-            return null;
-        }
-    }
-
-    static final class FindAllWalkFunction implements Function<Stream<StackWalker.StackFrame>, Collection<Class<?>>> {
-        private final Set<ClassLoader> rejectClassLoaders;
-
-        FindAllWalkFunction(final Set<ClassLoader> rejectClassLoaders) {
-            this.rejectClassLoaders = rejectClassLoaders;
-        }
-
-        public Collection<Class<?>> apply(final Stream<StackWalker.StackFrame> stream) {
-            final Collection<Class<?>> results = new LinkedHashSet<>();
-            final Iterator<StackWalker.StackFrame> iterator = stream.iterator();
-            while (iterator.hasNext()) {
-                final Class<?> clazz = iterator.next().getDeclaringClass();
-                final ClassLoader classLoader = clazz.getClassLoader();
-                if (classLoader != null && ! rejectClassLoaders.contains(classLoader)) {
-                    results.add(clazz);
-                }
-            }
-            return results;
-        }
-    }
 }
