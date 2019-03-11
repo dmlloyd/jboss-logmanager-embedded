@@ -60,6 +60,12 @@
             <groupId>com.oracle.substratevm</groupId>
             <artifactId>svm</artifactId>
             <version>1.0.0-rc12</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
