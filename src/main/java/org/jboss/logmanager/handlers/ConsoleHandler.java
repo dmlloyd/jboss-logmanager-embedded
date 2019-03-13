@@ -71,7 +71,7 @@ public class ConsoleHandler extends OutputStreamHandler {
             }
             record.setParameters(new Object[] {
                 codeStr,
-                Integer.toString(code),
+                Integer.valueOf(code),
                 msg,
             });
             record.setThrown(ex);
