@@ -33,19 +33,17 @@ import org.wildfly.common.format.Printf;
 /**
  */
 class ColorPrintf extends Printf {
-    ColorPrintf() {
+    private final int darken;
+
+    ColorPrintf(final int darken) {
         super(Locale.getDefault());
+        this.darken = darken;
     }
 
     public StringBuilder formatDirect(final StringBuilder destination, final String format, final Object... params) {
-        restoreColor(destination);
-        super.formatDirect(destination, format, params);
         ColorUtil.endFgColor(destination);
+        super.formatDirect(destination, format, params);
         return destination;
-    }
-
-    private static void restoreColor(final StringBuilder destination) {
-        ColorUtil.startFgColor(destination, isTrueColor(), 0xff, 0xff, 0xff);
     }
 
     protected void formatTimeTextField(final StringBuilder target, final TemporalAccessor ta, final TemporalField field, final String[] symbols, final GeneralFlags genFlags, final int width) {
@@ -79,14 +77,14 @@ class ColorPrintf extends Printf {
 
     protected void formatPlainString(final StringBuilder target, final Object item, final GeneralFlags genFlags, final int width, final int precision) {
         if (item instanceof Class || item instanceof Executable || item instanceof Field) {
-            ColorUtil.startFgColor(target, isTrueColor(), 0xff, 0xff, 0xdd);
+            ColorUtil.startFgColor(target, isTrueColor(), 0xff >>> darken, 0xff >>> darken, 0xdd >>> darken);
         } else if (item instanceof UUID) {
-            ColorUtil.startFgColor(target, isTrueColor(), 0xdd, 0xff, 0xdd);
+            ColorUtil.startFgColor(target, isTrueColor(), 0xdd >>> darken, 0xff >>> darken, 0xdd >>> darken);
         } else {
-            ColorUtil.startFgColor(target, isTrueColor(), 0xdd, 0xdd, 0xdd);
+            ColorUtil.startFgColor(target, isTrueColor(), 0xdd >>> darken, 0xdd >>> darken, 0xdd >>> darken);
         }
         super.formatPlainString(target, item, genFlags, width, precision);
-        restoreColor(target);
+        ColorUtil.endFgColor(target);
     }
 
     protected void formatBoolean(final StringBuilder target, final Object item, final GeneralFlags genFlags, final int width, final int precision) {
