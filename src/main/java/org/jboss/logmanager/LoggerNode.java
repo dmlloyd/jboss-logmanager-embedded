@@ -19,9 +19,11 @@ package org.jboss.logmanager;
 import com.oracle.svm.core.annotate.AlwaysInline;
 import org.wildfly.common.lock.SpinLock;
 
+import java.lang.reflect.UndeclaredThrowableException;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.logging.ErrorManager;
 import java.util.logging.Filter;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -34,6 +36,7 @@ import static java.lang.Math.max;
 final class LoggerNode {
 
     private static final Object[] NO_ATTACHMENTS = new Object[0];
+    private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
 
     /**
      * The log context.
@@ -317,7 +320,22 @@ final class LoggerNode {
         } catch (VirtualMachineError e) {
             throw e;
         } catch (Throwable t) {
-            // todo - error handler
+            ErrorManager errorManager = handler.getErrorManager();
+            if (errorManager != null) {
+                Exception e;
+                if (t instanceof Exception) {
+                    e = (Exception) t;
+                } else {
+                    e = new UndeclaredThrowableException(t);
+                    e.setStackTrace(EMPTY_STACK);
+                }
+                try {
+                    errorManager.error("Handler publication threw an exception", e, ErrorManager.WRITE_FAILURE);
+                } catch (Throwable t2) {
+                    System.err.println("Handler.reportError caught:");
+                    t2.printStackTrace();
+                }
+            }
         }
         if (useParentHandlers) {
             final LoggerNode parent = this.parent;
