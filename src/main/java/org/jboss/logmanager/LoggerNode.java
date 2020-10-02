@@ -317,25 +317,9 @@ final class LoggerNode {
     void publish(final ExtLogRecord record) {
         for (Handler handler : getHandlers()) try {
             handler.publish(record);
-        } catch (VirtualMachineError e) {
-            throw e;
-        } catch (Throwable t) {
-            ErrorManager errorManager = handler.getErrorManager();
-            if (errorManager != null) {
-                Exception e;
-                if (t instanceof Exception) {
-                    e = (Exception) t;
-                } else {
-                    e = new UndeclaredThrowableException(t);
-                    e.setStackTrace(EMPTY_STACK);
-                }
-                try {
-                    errorManager.error("Handler publication threw an exception", e, ErrorManager.WRITE_FAILURE);
-                } catch (Throwable t2) {
-                    System.err.println("Handler.reportError caught:");
-                    t2.printStackTrace();
-                }
-            }
+        } catch (Exception e) {
+            ExtHandler.reportError(handler, "Handler publication threw an exception", e, ErrorManager.WRITE_FAILURE);
+        } catch (Throwable ignored) {
         }
         if (useParentHandlers) {
             final LoggerNode parent = this.parent;

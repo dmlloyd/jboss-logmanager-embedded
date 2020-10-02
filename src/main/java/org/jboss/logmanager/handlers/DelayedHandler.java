@@ -16,16 +16,16 @@
 
 package org.jboss.logmanager.handlers;
 
+import org.jboss.logmanager.ExtHandler;
+import org.jboss.logmanager.ExtLogRecord;
+import org.jboss.logmanager.StandardOutputStreams;
+import org.jboss.logmanager.formatters.PatternFormatter;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
-
-import org.jboss.logmanager.ExtHandler;
-import org.jboss.logmanager.ExtLogRecord;
-import org.jboss.logmanager.StandardOutputStreams;
-import org.jboss.logmanager.formatters.PatternFormatter;
 
 /**
  * A handler that queues messages until it's at least one child handler is {@linkplain #addHandler(Handler) added} or
@@ -46,13 +46,13 @@ public class DelayedHandler extends ExtHandler {
     protected void doPublish(final ExtLogRecord record) {
         // If activated just delegate
         if (activated) {
-            publishToChildren(record);
+            publishToNestedHandlers(record);
             super.doPublish(record);
         } else {
             synchronized (this) {
                 // Check one more time to see if we've been activated before queuing the messages
                 if (activated) {
-                    publishToChildren(record);
+                    publishToNestedHandlers(record);
                     super.doPublish(record);
                 } else {
                     // Determine if we need to calculate the caller information before we queue the record
@@ -197,15 +197,9 @@ public class DelayedHandler extends ExtHandler {
         ExtLogRecord record;
         while ((record = logRecords.pollFirst()) != null) {
             if (isEnabled() && isLoggable(record) && Logger.getLogger(record.getLoggerName()).isLoggable(record.getLevel())) {
-                publishToChildren(record);
+                publishToNestedHandlers(record);
             }
         }
         activated = true;
-    }
-
-    private void publishToChildren(final ExtLogRecord record) {
-        for (Handler handler : handlers) {
-            handler.publish(record);
-        }
     }
 }

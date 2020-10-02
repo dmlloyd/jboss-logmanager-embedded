@@ -25,7 +25,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.Executors;
 
 import java.util.logging.Handler;
-import java.util.logging.ErrorManager;
 
 /**
  * An asynchronous log handler which is used to write to a handler or group of handlers which are "slow" or introduce
@@ -194,21 +193,7 @@ public class AsyncHandler extends ExtHandler {
                         intr = true;
                         continue;
                     }
-                    for (Handler handler : handlers) try {
-                        if (handler != null) {
-                            handler.publish(rec);
-                        }
-                    } catch (Exception e) {
-                        final ErrorManager errorManager = getErrorManager();
-                        if (errorManager != null) {
-                            try {
-                                errorManager.error("Publication error", e, ErrorManager.WRITE_FAILURE);
-                            } catch (Throwable t) {
-                            }
-                        }
-                    } catch (Throwable t) {
-                        // ignore :-/
-                    }
+                    publishToNestedHandlers(rec);
                 }
             } finally {
                 if (intr) {
