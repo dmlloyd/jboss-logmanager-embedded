@@ -19,7 +19,6 @@ package org.jboss.logmanager;
 import com.oracle.svm.core.annotate.AlwaysInline;
 import org.wildfly.common.lock.SpinLock;
 
-import java.lang.reflect.UndeclaredThrowableException;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
@@ -34,9 +33,6 @@ import static java.lang.Math.max;
  * A node in the tree of logger names.  Maintains weak references to children and a strong reference to its parent.
  */
 final class LoggerNode {
-
-    private static final Object[] NO_ATTACHMENTS = new Object[0];
-    private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
 
     /**
      * The log context.
@@ -100,9 +96,14 @@ final class LoggerNode {
 
     private final SpinLock attachmentLock = new SpinLock();
 
-    private Logger.AttachmentKey<?> attachmentKey;
+    private Logger.AttachmentKey<?> att1Key;
+    private Object att1;
 
-    private Object attachment;
+    private Logger.AttachmentKey<?> att2Key;
+    private Object att2;
+
+    private Logger.AttachmentKey<?> att3Key;
+    private Object att3;
 
     /**
      * Construct a new root instance.
@@ -370,7 +371,7 @@ final class LoggerNode {
         final SpinLock lock = this.attachmentLock;
         lock.lock();
         try {
-            return key == attachmentKey ? (V) attachment : null;
+            return key == att1Key ? (V) att1 : key == att2Key ? (V) att2 : key == att3Key ? (V) att3 : null;
         } finally {
             lock.unlock();
         }
@@ -387,16 +388,40 @@ final class LoggerNode {
         final SpinLock lock = this.attachmentLock;
         lock.lock();
         try {
-            final Logger.AttachmentKey<?> attachmentKey = this.attachmentKey;
+            Logger.AttachmentKey<?> attachmentKey = this.att1Key;
             if (attachmentKey == null) {
-                this.attachmentKey = key;
-                attachment = value;
+                this.att1Key = key;
+                att1 = value;
                 return null;
             } else if (key == attachmentKey) {
                 try {
-                    return (V) attachment;
+                    return (V) att1;
                 } finally {
-                    attachment = value;
+                    att1 = value;
+                }
+            }
+            attachmentKey = this.att2Key;
+            if (attachmentKey == null) {
+                this.att2Key = key;
+                att2 = value;
+                return null;
+            } else if (key == attachmentKey) {
+                try {
+                    return (V) att2;
+                } finally {
+                    att2 = value;
+                }
+            }
+            attachmentKey = this.att3Key;
+            if (attachmentKey == null) {
+                this.att3Key = key;
+                att3 = value;
+                return null;
+            } else if (key == attachmentKey) {
+                try {
+                    return (V) att3;
+                } finally {
+                    att3 = value;
                 }
             }
         } finally {
@@ -416,13 +441,29 @@ final class LoggerNode {
         final SpinLock lock = this.attachmentLock;
         lock.lock();
         try {
-            final Logger.AttachmentKey<?> attachmentKey = this.attachmentKey;
+            Logger.AttachmentKey<?> attachmentKey = this.att1Key;
             if (attachmentKey == null) {
-                this.attachmentKey = key;
-                attachment = value;
+                this.att1Key = key;
+                att1 = value;
                 return null;
             } else if (key == attachmentKey) {
-                return (V) attachment;
+                return (V) att1;
+            }
+            attachmentKey = this.att2Key;
+            if (attachmentKey == null) {
+                this.att2Key = key;
+                att2 = value;
+                return null;
+            } else if (key == attachmentKey) {
+                return (V) att2;
+            }
+            attachmentKey = this.att3Key;
+            if (attachmentKey == null) {
+                this.att3Key = key;
+                att3 = value;
+                return null;
+            } else if (key == attachmentKey) {
+                return (V) att3;
             }
         } finally {
             lock.unlock();
@@ -438,13 +479,26 @@ final class LoggerNode {
         final SpinLock lock = this.attachmentLock;
         lock.lock();
         try {
-            final Logger.AttachmentKey<?> attachmentKey = this.attachmentKey;
-            if (attachmentKey == key) {
+            if (key == att1Key) {
                 try {
-                    return (V) attachment;
+                    return (V) att1;
                 } finally {
-                    this.attachmentKey = null;
-                    this.attachment = null;
+                    this.att1Key = null;
+                    this.att1 = null;
+                }
+            } else if (key == att2Key) {
+                try {
+                    return (V) att2;
+                } finally {
+                    this.att2Key = null;
+                    this.att2 = null;
+                }
+            } else if (key == att3Key) {
+                try {
+                    return (V) att3;
+                } finally {
+                    this.att3Key = null;
+                    this.att3 = null;
                 }
             } else {
                 return null;
