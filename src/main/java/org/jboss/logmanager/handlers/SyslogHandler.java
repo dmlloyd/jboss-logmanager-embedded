@@ -625,7 +625,7 @@ public class SyslogHandler extends ExtHandler {
      * @param appName the app name to use
      *
      * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
+     *                           LoggingPermission(control)}
      */
     public void setAppName(final String appName) {
         synchronized (outputLock) {
@@ -735,7 +735,7 @@ public class SyslogHandler extends ExtHandler {
      * @param port the port
      *
      * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
+     *                           LoggingPermission(control)}
      */
     public void setPort(final int port) {
         synchronized (outputLock) {
@@ -761,7 +761,7 @@ public class SyslogHandler extends ExtHandler {
      * @param facility the facility
      *
      * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
+     *                           LoggingPermission(control)}
      */
     public void setFacility(final Facility facility) {
         synchronized (outputLock) {
@@ -896,7 +896,7 @@ public class SyslogHandler extends ExtHandler {
      * @param useCountingFraming {@code true} if the message being sent should be prefixed with the size of the message
      *
      * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
+     *                           LoggingPermission(control)}
      */
     public void setUseCountingFraming(final boolean useCountingFraming) {
         synchronized (outputLock) {
@@ -912,7 +912,7 @@ public class SyslogHandler extends ExtHandler {
      * @throws UnknownHostException if no IP address for the host could be found, or if a scope_id was specified for a
      *                              global IPv6 address.
      * @throws SecurityException    if a security manager exists and if the caller does not have {@code
-     *                              LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
+     *                              LoggingPermission(control)}
      * @see InetAddress#getByName(String)
      */
     public void setServerHostname(final String hostname) throws UnknownHostException {
@@ -936,7 +936,7 @@ public class SyslogHandler extends ExtHandler {
      * @param serverAddress the server address
      *
      * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
+     *                           LoggingPermission(control)}
      */
     public void setServerAddress(final InetAddress serverAddress) {
         synchronized (outputLock) {
@@ -962,7 +962,7 @@ public class SyslogHandler extends ExtHandler {
      * @param syslogType the syslog type
      *
      * @throws SecurityException if a security manager exists and if the caller does not have {@code
-     *                           LoggingPermission(control)} or the handler is {@link #protect(Object) protected}
+     *                           LoggingPermission(control)}
      */
     public void setSyslogType(final SyslogType syslogType) {
         synchronized (outputLock) {
@@ -997,9 +997,10 @@ public class SyslogHandler extends ExtHandler {
      * Sets the output stream for the syslog handler to write to.
      * <p/>
      * Setting the output stream closes any already established connections or open output streams and will not open
-     * any new connections until the output stream is set to {@code null}. The {@link
-     * #setProtocol(org.jboss.logmanager.handlers.SyslogHandler.Protocol) protocol}, {@link
-     * #setServerAddress(java.net.InetAddress), server address}, {@link #setServerHostname(String) server hostname} or
+     * any new connections until the output stream is set to {@code null}. The
+     * {@link #setProtocol(org.jboss.logmanager.handlers.SyslogHandler.Protocol) protocol},
+     * {@link #setServerAddress(java.net.InetAddress) server address},
+     * {@link #setServerHostname(String) server hostname} or
      * {@link #setPort(int) port} have no effect when the output stream is set.
      *
      * @param out the output stream to write to

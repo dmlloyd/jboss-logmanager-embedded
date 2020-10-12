@@ -168,8 +168,8 @@ public class DelayedHandler extends ExtHandler {
      * records.
      * <p>
      * If set to {@code true} the {@linkplain ExtLogRecord#copyAll() caller information} will be calculated for each
-     * record that is placed in the queue. A value of {@code false} means the
-     * {@link super#isCallerCalculationRequired()} will be used.
+     * record that is placed in the queue. A value of {@code false} means
+     * {@link ExtHandler#isCallerCalculationRequired()} will be used.
      * </p>
      * <p>
      * Note that the caller information is only attempted to be calculated when the handler has not been activated. Once
