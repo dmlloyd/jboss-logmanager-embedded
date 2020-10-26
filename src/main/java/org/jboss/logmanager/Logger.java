@@ -83,8 +83,8 @@ public final class Logger extends java.util.logging.Logger implements Serializab
     Logger(final LoggerNode loggerNode, final String name) {
         // Don't set up the bundle in the parent...
         super(name, null);
-        // We maintain our own level
-        super.setLevel(Level.ALL);
+        // We have to propagate our level to an internal data structure in the superclass
+        super.setLevel(loggerNode.getLevel());
         this.loggerNode = loggerNode;
     }
 
@@ -114,6 +114,8 @@ public final class Logger extends java.util.logging.Logger implements Serializab
      * log level reflects an older effective level than the actual level).
      */
     public void setLevel(Level newLevel) throws SecurityException {
+        // We have to propagate our level to an internal data structure in the superclass
+        super.setLevel(newLevel);
         loggerNode.setLevel(newLevel);
     }
 
