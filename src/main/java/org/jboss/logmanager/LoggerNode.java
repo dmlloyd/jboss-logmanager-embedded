@@ -19,9 +19,10 @@ package org.jboss.logmanager;
 import com.oracle.svm.core.annotate.AlwaysInline;
 import org.wildfly.common.lock.SpinLock;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.ErrorManager;
 import java.util.logging.Filter;
 import java.util.logging.Handler;
@@ -53,11 +54,9 @@ final class LoggerNode {
     private final ConcurrentMap<String, LoggerNode> children;
 
     /**
-     * The handlers for this logger.  May only be updated using the {@link #handlersUpdater} atomic updater.  The array
-     * instance should not be modified (treat as immutable).
+     * The handlers for this logger.  The array instance should not be modified (treat as immutable).
      */
-    @SuppressWarnings({ "UnusedDeclaration" })
-    private volatile Handler[] handlers;
+    private final AtomicReference<Handler[]> handlersRef = new AtomicReference<>();
 
     /**
      * Flag to specify whether parent handlers are used.
@@ -73,11 +72,6 @@ final class LoggerNode {
      * Flag to specify whether parent filters are used.
      */
     private volatile boolean useParentFilter = false;
-
-    /**
-     * The atomic updater for the {@link #handlers} field.
-     */
-    private static final AtomicArray<LoggerNode, Handler> handlersUpdater = AtomicArray.create(AtomicReferenceFieldUpdater.newUpdater(LoggerNode.class, Handler[].class, "handlers"), Handler.class);
 
     /**
      * The actual level.  May only be modified when the context's level change lock is held; in addition, changing
@@ -119,7 +113,7 @@ final class LoggerNode {
         final Level confLevel = configurator.getLevelOf(fullName);
         level = confLevel == null ? Level.INFO : confLevel;
         effectiveLevel = max(effectiveMinLevel, level.intValue());
-        handlersUpdater.set(this, configurator.getHandlersOf(fullName));
+        handlersRef.set(configurator.getHandlersOf(fullName));
         this.context = context;
         children = new CopyOnWriteMap<String, LoggerNode>();
     }
@@ -151,7 +145,7 @@ final class LoggerNode {
         effectiveMinLevel = minLevel == null ? parent.effectiveMinLevel : minLevel.intValue();
         level = configurator.getLevelOf(fullName);
         effectiveLevel = max(effectiveMinLevel, level == null ? parent.effectiveLevel : level.intValue());
-        handlersUpdater.set(this, configurator.getHandlersOf(fullName));
+        handlersRef.set(configurator.getHandlersOf(fullName));
         this.context = context;
         children = new CopyOnWriteMap<String, LoggerNode>();
     }
@@ -275,36 +269,54 @@ final class LoggerNode {
     }
 
     Handler[] getHandlers() {
-        Handler[] handlers = this.handlers;
+        Handler[] handlers = handlersRef.get();
         if (handlers == null) {
             synchronized (this) {
                 handlers = LogContext.CONFIGURATOR.getHandlersOf(fullName);
-                this.handlers = handlers;
+                handlersRef.set(handlers);
             }
         }
         return handlers;
     }
 
     Handler[] clearHandlers() {
-        final Handler[] handlers = this.handlers;
-        handlersUpdater.set(this, EmbeddedConfigurator.NO_HANDLERS);
-        return handlers.length > 0 ? handlers.clone() : handlers;
+        return setHandlers(EmbeddedConfigurator.NO_HANDLERS);
     }
 
     void removeHandler(final Handler handler) {
-        handlersUpdater.remove(this, handler, true);
+        retry: for (;;) {
+            Handler[] handlers = getHandlers();
+            int length = handlers.length;
+            for (int i = 0; i < length; i++) {
+                if (handlers[i] == handler) {
+                    Handler[] newHandlers = Arrays.copyOf(handlers, length - 1);
+                    System.arraycopy(handlers, i + 1, newHandlers, i, length - i);
+                    if (! compareAndSetHandlers(handlers, newHandlers)) {
+                        continue retry;
+                    }
+                    return;
+                }
+            }
+        }
     }
 
     void addHandler(final Handler handler) {
-        handlersUpdater.add(this, handler);
+        Handler[] oldVal, newVal;
+        int len;
+        do {
+            oldVal = getHandlers();
+            len = oldVal.length;
+            newVal = Arrays.copyOf(oldVal, len + 1);
+            newVal[len] = handler;
+        } while (! handlersRef.compareAndSet(oldVal, newVal));
     }
 
     Handler[] setHandlers(final Handler[] handlers) {
-        return handlersUpdater.getAndSet(this, handlers);
+        return handlersRef.getAndSet(handlers);
     }
 
     boolean compareAndSetHandlers(final Handler[] oldHandlers, final Handler[] newHandlers) {
-        return handlersUpdater.compareAndSet(this, oldHandlers, newHandlers);
+        return handlersRef.compareAndSet(oldHandlers, newHandlers);
     }
 
     boolean getUseParentHandlers() {
