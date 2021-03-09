@@ -290,7 +290,7 @@ final class LoggerNode {
             for (int i = 0; i < length; i++) {
                 if (handlers[i] == handler) {
                     Handler[] newHandlers = Arrays.copyOf(handlers, length - 1);
-                    System.arraycopy(handlers, i + 1, newHandlers, i, length - i);
+                    System.arraycopy(handlers, i + 1, newHandlers, i, length - i - 1);
                     if (! compareAndSetHandlers(handlers, newHandlers)) {
                         continue retry;
                     }
