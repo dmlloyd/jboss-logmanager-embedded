@@ -19,6 +19,7 @@ package org.jboss.logmanager;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.text.MessageFormat;
 import java.util.Map;
 import java.util.MissingResourceException;
@@ -118,6 +119,7 @@ public class ExtLogRecord extends LogRecord {
         hostName = original.hostName;
         processName = original.processName;
         processId = original.processId;
+        marker = original.marker;
     }
 
     /**
@@ -141,7 +143,7 @@ public class ExtLogRecord extends LogRecord {
     private transient boolean calculateCaller = true;
 
     private String ndc;
-    private FormatStyle formatStyle = FormatStyle.MESSAGE_FORMAT;
+    private FormatStyle formatStyle;
     private FastCopyHashMap<String, Object> mdcCopy;
     private int sourceLineNumber = -1;
     private String sourceFileName;
@@ -151,6 +153,7 @@ public class ExtLogRecord extends LogRecord {
     private long processId = -1;
     private String sourceModuleName;
     private String sourceModuleVersion;
+    private Object marker;
 
     private void writeObject(ObjectOutputStream oos) throws IOException {
         copyAll();
@@ -171,6 +174,7 @@ public class ExtLogRecord extends LogRecord {
         processId = fields.get("processId", -1L);
         sourceModuleName = (String) fields.get("sourceModuleName", null);
         sourceModuleVersion = (String) fields.get("sourceModuleVersion", null);
+        marker = fields.get("marker", null);
     }
 
     /**
@@ -614,5 +618,16 @@ public class ExtLogRecord extends LogRecord {
      */
     public void setResourceBundleName(final String name) {
         super.setResourceBundleName(name);
+    }
+
+    /**
+     * Set the marker for this event. Markers are used mostly by SLF4J and Log4j.
+     */
+    public void setMarker(Object marker) {
+        this.marker = marker;
+    }
+
+    public Object getMarker() {
+        return marker;
     }
 }
