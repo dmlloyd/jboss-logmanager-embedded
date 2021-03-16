@@ -297,6 +297,8 @@ final class LoggerNode {
                     return;
                 }
             }
+            // not found
+            return;
         }
     }
 

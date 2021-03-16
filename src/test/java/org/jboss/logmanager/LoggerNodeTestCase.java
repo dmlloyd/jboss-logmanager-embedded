@@ -1,5 +1,6 @@
 package org.jboss.logmanager;
 
+import org.jboss.logmanager.handlers.ConsoleHandler;
 import org.jboss.logmanager.handlers.DelayedHandler;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,7 @@ public class LoggerNodeTestCase {
         Handler[] handlers = node.getHandlers();
         assertEquals(handlers.length, 1);
         assertEquals(handlers[0], handler);
+        node.removeHandler(new ConsoleHandler());
     }
 
     static <T> T[] array(T... vals) {
