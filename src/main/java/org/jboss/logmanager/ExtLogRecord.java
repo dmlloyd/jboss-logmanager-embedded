@@ -19,7 +19,6 @@ package org.jboss.logmanager;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.text.MessageFormat;
 import java.util.Map;
 import java.util.MissingResourceException;
@@ -144,7 +143,7 @@ public class ExtLogRecord extends LogRecord {
 
     private String ndc;
     private FormatStyle formatStyle;
-    private FastCopyHashMap<String, Object> mdcCopy;
+    private Map<String, Object> mdcCopy;
     private int sourceLineNumber = -1;
     private String sourceFileName;
     private String threadName;
@@ -202,7 +201,7 @@ public class ExtLogRecord extends LogRecord {
      */
     public void copyMdc() {
         if (mdcCopy == null) {
-            mdcCopy = MDC.fastCopyObject();
+            mdcCopy = MDC.copyObject();
         }
     }
 
@@ -228,7 +227,7 @@ public class ExtLogRecord extends LogRecord {
      */
     public Map<String, String> getMdcCopy() {
         if (mdcCopy == null) {
-            mdcCopy = MDC.fastCopyObject();
+            mdcCopy = MDC.copyObject();
         }
         // Create a new map with string values
         final FastCopyHashMap<String, String> newMdc = new FastCopyHashMap<String, String>();
