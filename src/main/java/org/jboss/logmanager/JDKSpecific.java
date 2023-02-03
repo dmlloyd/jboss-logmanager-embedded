@@ -1,5 +1,8 @@
 /*
- * Copyright 2018 Red Hat, Inc.
+ * JBoss, Home of Professional Open Source.
+ *
+ * Copyright 2018 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +19,15 @@
 
 package org.jboss.logmanager;
 
-import java.security.AccessController;
+import static java.security.AccessController.doPrivileged;
+
+import java.lang.module.ModuleDescriptor;
 import java.security.PrivilegedAction;
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 import org.jboss.modules.Module;
 import org.jboss.modules.Version;
@@ -26,13 +36,14 @@ import org.jboss.modules.Version;
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 final class JDKSpecific {
+
+    static final StackWalker WALKER = doPrivileged(new GetStackWalkerAction());
+
     private JDKSpecific() {}
 
-    private static final Gateway GATEWAY;
     private static final boolean JBOSS_MODULES;
 
     static {
-        GATEWAY = AccessController.doPrivileged(new GatewayPrivilegedAction());
         boolean jbossModules = false;
         try {
             Module.getStartTime();
@@ -41,53 +52,27 @@ final class JDKSpecific {
         JBOSS_MODULES = jbossModules;
     }
 
-    static final class Gateway extends SecurityManager {
-        protected Class<?>[] getClassContext() {
-            return super.getClassContext();
-        }
-    }
-
     static void calculateCaller(ExtLogRecord logRecord) {
-        final String loggerClassName = logRecord.getLoggerClassName();
-        final StackTraceElement[] stackTrace = new Throwable().getStackTrace();
-        final Class<?>[] classes = GATEWAY.getClassContext();
-        // The stack trace may be missing classes, but the class context is not, so if we find a mismatch, we skip the class context items.
-        int i = 1, j = 0;
-        Class<?> clazz = classes[i++];
-        StackTraceElement element = stackTrace[j++];
-        boolean found = false;
-        for (;;) {
-            if (clazz.getName().equals(element.getClassName())) {
-                if (clazz.getName().equals(loggerClassName)) {
-                    // next entry could be the one we want!
-                    found = true;
+        WALKER.walk(new CallerCalcFunction(logRecord));
+    }
+
+    static void calculateJdkModule(final ExtLogRecord logRecord, final Class<?> clazz) {
+        final java.lang.Module module = clazz.getModule();
+        if (module != null) {
+            logRecord.setSourceModuleName(module.getName());
+            final ModuleDescriptor descriptor = module.getDescriptor();
+            if (descriptor != null) {
+                final Optional<ModuleDescriptor.Version> optional = descriptor.version();
+                if (optional.isPresent()) {
+                    logRecord.setSourceModuleVersion(optional.get().toString());
                 } else {
-                    if (found) {
-                        logRecord.setSourceClassName(element.getClassName());
-                        logRecord.setSourceMethodName(element.getMethodName());
-                        logRecord.setSourceFileName(element.getFileName());
-                        logRecord.setSourceLineNumber(element.getLineNumber());
-                        if (JBOSS_MODULES) {
-                            calculateModule(logRecord, clazz);
-                        }
-                        return;
-                    }
+                    logRecord.setSourceModuleVersion(null);
                 }
-                if (j == stackTrace.length) {
-                    logRecord.setUnknownCaller();
-                    return;
-                }
-                element = stackTrace[j ++];
             }
-            if (i == classes.length) {
-                logRecord.setUnknownCaller();
-                return;
-            }
-            clazz = classes[i ++];
         }
     }
 
-    private static void calculateModule(final ExtLogRecord logRecord, final Class<?> clazz) {
+    static void calculateModule(final ExtLogRecord logRecord, final Class<?> clazz) {
         final Module module = Module.forClass(clazz);
         if (module != null) {
             logRecord.setSourceModuleName(module.getName());
@@ -97,15 +82,52 @@ final class JDKSpecific {
             } else {
                 logRecord.setSourceModuleVersion(null);
             }
+        } else {
+            calculateJdkModule(logRecord, clazz);
         }
     }
 
-    static class GatewayPrivilegedAction implements PrivilegedAction<Gateway> {
-        GatewayPrivilegedAction() {
+    static final class CallerCalcFunction implements Function<Stream<StackWalker.StackFrame>, Void> {
+        private final ExtLogRecord logRecord;
+
+        CallerCalcFunction(final ExtLogRecord logRecord) {
+            this.logRecord = logRecord;
         }
 
-        public Gateway run() {
-            return new Gateway();
+        public Void apply(final Stream<StackWalker.StackFrame> stream) {
+            final String loggerClassName = logRecord.getLoggerClassName();
+            final Iterator<StackWalker.StackFrame> iterator = stream.iterator();
+            boolean found = false;
+            while (iterator.hasNext()) {
+                final StackWalker.StackFrame frame = iterator.next();
+                final Class<?> clazz = frame.getDeclaringClass();
+                if (clazz.getName().equals(loggerClassName)) {
+                    // next entry could be the one we want!
+                    found = true;
+                } else if (found) {
+                    logRecord.setSourceClassName(frame.getClassName());
+                    logRecord.setSourceMethodName(frame.getMethodName());
+                    logRecord.setSourceFileName(frame.getFileName());
+                    logRecord.setSourceLineNumber(frame.getLineNumber());
+                    if (JBOSS_MODULES) {
+                        calculateModule(logRecord, clazz);
+                    } else {
+                        calculateJdkModule(logRecord, clazz);
+                    }
+                    return null;
+                }
+            }
+            logRecord.setUnknownCaller();
+            return null;
         }
     }
+
+    static final class GetStackWalkerAction implements PrivilegedAction<StackWalker> {
+        GetStackWalkerAction() {}
+
+        public StackWalker run() {
+            return StackWalker.getInstance(EnumSet.of(StackWalker.Option.RETAIN_CLASS_REFERENCE));
+        }
+    }
+
 }

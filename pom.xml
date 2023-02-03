@@ -52,7 +52,7 @@
         <version.org.jboss.modules.jboss-modules>1.7.0.Final</version.org.jboss.modules.jboss-modules>
         <version.org.wildfly.common.wildfly-common>1.5.0.Final-format-001</version.org.wildfly.common.wildfly-common>
 
-        <jdk.min.version>9</jdk.min.version>
+        <jdk.min.version>11</jdk.min.version>
     </properties>
 
     <dependencies>
@@ -112,7 +112,7 @@
                             <goal>compile</goal>
                         </goals>
                         <configuration>
-                            <release>8</release>
+                            <release>11</release>
                         </configuration>
                     </execution>
                 </executions>
