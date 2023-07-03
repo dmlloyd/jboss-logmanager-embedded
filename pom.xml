@@ -43,7 +43,7 @@
         <relocation>
             <groupId>org.jboss.logmanager</groupId>
             <artifactId>jboss-logmanager</artifactId>
-            <version>3.0.0.Alpha1</version>
+            <version>3.0.0.Beta2</version>
         </relocation>
     </distributionManagement>
 </project>
