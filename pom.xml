@@ -8,7 +8,7 @@
     <artifactId>jboss-logmanager-embedded</artifactId>
     <packaging>pom</packaging>
 
-    <version>1.2.0.Beta3-SNAPSHOT</version>
+    <version>1.2.0.Final</version>
 
     <name>JBoss Log Manager (Embedded) (Relocation)</name>
     <description>Relocation of the JBoss LogManager artifact</description>
@@ -43,7 +43,7 @@
         <relocation>
             <groupId>org.jboss.logmanager</groupId>
             <artifactId>jboss-logmanager</artifactId>
-            <version>3.0.0.Beta2</version>
+            <version>3.0.0.Final</version>
         </relocation>
     </distributionManagement>
 </project>
